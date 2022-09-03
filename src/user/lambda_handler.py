@@ -22,7 +22,11 @@ table = dynamodb.Table('survivor-league-db')
     #   latest_week: 0 
     # }
 
-def setup_new_user(username, fullname):
+def setup_new_user(body):
+    username = body["username"]
+    fullname= body["fullname"]
+
+    print(username + fullname)
     try:
         table.put_item(
             Item={
@@ -30,7 +34,7 @@ def setup_new_user(username, fullname):
                 'id': username,
                 'username': username,
                 'name': fullname,
-                'user_picked_teams':  {"Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": "","Team": ""},
+                'user_picked_teams':  [{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""}],
                 'start_streak': 0,
                 'is_start_streak_alive': True,
                 'latest_streak': 0,
@@ -58,6 +62,22 @@ def setup_new_user(username, fullname):
     #   latest_week: int,
     # }
 
+def get_curr_user_info(username):
+    print(username)
+    try:
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
+        userinfo = resp["Items"][0]
+        return {
+            "username": userinfo["username"],
+            "fullname": userinfo["name"],
+            "start_streak": int(userinfo['start_streak']),
+            "total_correct": int(userinfo['total_correct']),
+            "is_start_streak_alive": userinfo['is_start_streak_alive'],
+            "user_picked_teams": userinfo["user_picked_teams"]
+        }
+    except Exception as e:
+        raise Exception("Unable to get user info with error: " + str(e))
+
 # submit_user_pick(string username, string team, int week #)
 # submit user's pick for a given week
 #   if week is before current week or team already used, reject
@@ -72,18 +92,28 @@ def setup_new_user(username, fullname):
 
 def lambda_handler(event, context):
     print(event)
-    body = json.loads(event["body"])
     
     if(event["path"] == "/setup-new-user"):
         print("Setting up new user")
-        setup_new_user(body["username"], body["fullname"])
-
-    return {
-        "statusCode": 201,
-        "headers": {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": '*'
+        code = setup_new_user(json.loads(event["body"]))
+        return {
+            "statusCode": 201,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
             }
         }    
+
+    elif(event["path"] == "/userinfo"):
+        print("Getting user info")
+        user = get_curr_user_info(event["queryStringParameters"]["user"])
+        return {
+            "statusCode": 200,
+            "body": json.dumps(user, sort_keys=True),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+                }
+            }    
 
 

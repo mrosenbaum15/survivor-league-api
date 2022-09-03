@@ -93,9 +93,11 @@ table = dynamodb.Table('survivor-league-db')
     # ]
 
 def get_all_matchups():
-    resp = table.query(KeyConditionExpression= Key('type').eq('matchup') &  Key('id').eq('all'))
-    return resp["Items"][0]["matchups"]
-
+    try:
+        resp = table.query(KeyConditionExpression= Key('type').eq('matchup') &  Key('id').eq('all'))
+        return resp["Items"][0]["matchups"]
+    except Exception as e:
+        raise Exception("Unable to get matchups with error: " + str(e))
 
 # submit_user_pick(string username, string team, int week #)
 # submit user's pick for a given week
@@ -105,6 +107,22 @@ def get_all_matchups():
 #         update user_picked_teams[week #] = <team>: null
 #         write user entire user object back as an item 
 
+def submit_user_pick(body):
+    username = body["username"]
+    week_num = body["weekNum"]
+    team = body["pick"].strip()
+
+    try:
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
+        curr_user = resp["Items"][0]
+
+        curr_user["user_picked_teams"][week_num-1] = {team: ""}
+
+        table.put_item(
+            Item=curr_user
+        )
+    except Exception as e:
+        raise Exception("Unable to submit pick with error: " + str(e))
 
 
 
@@ -117,17 +135,29 @@ def lambda_handler(event, context):
     if(event["path"] == "/get-all-matchups"):
         print("GETTING ALL MATCHUPS")
         matchups = get_all_matchups()
+        return {
+            "statusCode": 200,
+            "body": json.dumps(matchups),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+            }
+        }    
+
+
+    elif(event["path"] == "/submit-pick"):
+        print("SUBMITTING PICK")
+        submit_user_pick(json.loads(event["body"]))
+        return {
+            "statusCode": 201,
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+            }
+        }    
 
     
     print(json.dumps(matchups))
 
-    return {
-        "statusCode": 200,
-        "body": json.dumps(matchups),
-        "headers": {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": '*'
-            }
-        }    
 
 
