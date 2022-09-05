@@ -95,7 +95,7 @@ table = dynamodb.Table('survivor-league-db')
 def get_all_matchups():
     try:
         resp = table.query(KeyConditionExpression= Key('type').eq('matchup') &  Key('id').eq('all'))
-        return resp["Items"][0]["matchups"]
+        return resp["Items"][0]["matchups"], resp["Items"][0]["deadlines"]
     except Exception as e:
         raise Exception("Unable to get matchups with error: " + str(e))
 
@@ -134,10 +134,14 @@ def lambda_handler(event, context):
     matchups = []
     if(event["path"] == "/get-all-matchups"):
         print("GETTING ALL MATCHUPS")
-        matchups = get_all_matchups()
+        matchups, deadlines = get_all_matchups()
+        return_body = {
+            "matchups": matchups,
+            "deadlines": deadlines
+        }
         return {
             "statusCode": 200,
-            "body": json.dumps(matchups),
+            "body": json.dumps(return_body),
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": '*'

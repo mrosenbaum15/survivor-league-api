@@ -1,6 +1,8 @@
 import json
+from datetime import datetime, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
+from src.utils.utils import get_current_week, week_to_date_range, is_dst
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('survivor-league-db')
@@ -63,10 +65,11 @@ def setup_new_user(body):
     # }
 
 def get_curr_user_info(username):
-    print(username)
+
     try:
         resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
         userinfo = resp["Items"][0]
+
         return {
             "username": userinfo["username"],
             "fullname": userinfo["name"],
@@ -77,6 +80,47 @@ def get_curr_user_info(username):
         }
     except Exception as e:
         raise Exception("Unable to get user info with error: " + str(e))
+
+        
+def get_curr_user_info_standings(username):
+
+    try:
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
+        userinfo = resp["Items"][0]
+
+        week_num = get_current_week()
+        sunday_of_curr_week = week_to_date_range(week_num)
+        
+        print("DONE WITH SUNDAY OF CURR WEEK")
+        today = datetime.now()
+
+        print(sunday_of_curr_week)
+        print(type(sunday_of_curr_week))
+
+        target_date = datetime.strptime(sunday_of_curr_week, '%d-%m-%Y %H:%M:%S')
+
+        print(target_date)
+        print(type(target_date))
+        
+        print(today)
+        print(type(today))
+
+        user_picks = []
+        if(today < target_date and week_num > 1):
+            user_picks = userinfo["user_picked_teams"][0:(week_num-2)]            
+        elif(today >= target_date):
+            user_picks = userinfo["user_picked_teams"][0:(week_num-1)]                    
+
+        return {
+            "username": userinfo["username"],
+            "fullname": userinfo["name"],
+            "start_streak": int(userinfo['start_streak']),
+            "total_correct": int(userinfo['total_correct']),
+            "is_start_streak_alive": userinfo['is_start_streak_alive'],
+            "user_picked_teams": user_picks
+        }
+    except Exception as e:
+        raise Exception("Unable to get user info with error: " + str(e))        
 
 # submit_user_pick(string username, string team, int week #)
 # submit user's pick for a given week
@@ -115,5 +159,17 @@ def lambda_handler(event, context):
                 "Access-Control-Allow-Origin": '*'
                 }
             }    
+
+    elif(event["path"] == "/user-info-standings"):
+        print("Getting user info for standings")
+        user = get_curr_user_info_standings(event["queryStringParameters"]["user"])
+        return {
+            "statusCode": 200,
+            "body": json.dumps(user, sort_keys=True),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+                }
+            }                
 
 
