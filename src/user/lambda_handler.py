@@ -107,9 +107,11 @@ def get_curr_user_info_standings(username):
 
         user_picks = []
         if(today < target_date and week_num > 1):
-            user_picks = userinfo["user_picked_teams"][0:(week_num-2)]            
+            user_picks = userinfo["user_picked_teams"][0:(week_num-1)]
+        elif(today >= target_date and week_num == 1):
+            user_picks.append(userinfo["user_picked_teams"][0])                          
         elif(today >= target_date):
-            user_picks = userinfo["user_picked_teams"][0:(week_num-1)]                    
+            user_picks = userinfo["user_picked_teams"][0:week_num]              
 
         return {
             "username": userinfo["username"],
@@ -130,6 +132,43 @@ def get_curr_user_info_standings(username):
 #         update user_picked_teams[week #] = <team>: null
 #         write user entire user object back as an item 
 
+def get_all_users(week_num):
+    try:
+
+        week_num = get_current_week()
+        sunday_of_curr_week = week_to_date_range(week_num)
+        
+        print("DONE WITH SUNDAY OF CURR WEEK")
+        today = datetime.now()
+
+        print(sunday_of_curr_week)
+        print(type(sunday_of_curr_week))
+
+        target_date = datetime.strptime(sunday_of_curr_week, '%d-%m-%Y %H:%M:%S')
+
+        print(target_date)
+        print(type(target_date))
+        
+        print(today)
+        print(type(today))
+
+        user_picks = []
+        if(today < target_date and week_num > 1):
+            user_picks = userinfo["user_picked_teams"][0:(week_num-2)]            
+        elif(today >= target_date):
+            user_picks = userinfo["user_picked_teams"][0:(week_num-1)]                    
+        
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo'))
+        userinfo = resp["Items"]
+
+        print(userinfo)
+        
+        user_return = []
+        for user in userinfo:
+            user_return.append({user['id']: user['user_picked_teams'][int(week_num)-1]})
+        return user_return
+    except Exception as e:
+        raise Exception("Unable to get user info with error: " + str(e))
 
 
 
@@ -166,6 +205,18 @@ def lambda_handler(event, context):
         return {
             "statusCode": 200,
             "body": json.dumps(user, sort_keys=True),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+                }
+            }                
+
+    elif(event["path"] == "/all-users"):
+        print("Getting user info for Current Week")
+        users = get_all_users(event["queryStringParameters"]["week_num"])
+        return {
+            "statusCode": 200,
+            "body": json.dumps(users, sort_keys=True),
             "headers": {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": '*'

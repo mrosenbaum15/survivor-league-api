@@ -34,47 +34,7 @@ table = dynamodb.Table('survivor-league-db')
 #           total_correct++
 #           
 
-# get_standings()
-# scan where pk = 'username' 
-#   example return value: 
-#        {
-#           "longest_start_streak": ["Rosey": 15, "Brad": 13, "Swill": 5],
-#           "most_correct": ["Rosey": 15, "Swill": 14, "Brad": 13]
-#        }
-            
-#   push first user into new dict: 
-#   for each user after: 
-#       for each in longest_start_streak
-#           if start_streak >= other_start_streak:
-#               insert before
-#           else:
-#               continue to next user;
-#           
-#           if most_correct >= other_most_correct:
-#               insert before
-#           else:
-#               continue to next user:     
-#
-#        
 
-
-# get_other_user_info()
-# on the standings page, only allow users to see up to a given week
-#      need backend to determine current week
-#      pk = 'username', sk = None
-#      query the DB table using pk and 'username' = <username>
-#      return:
-#       Item {
-#           id: 'userinfo',  
-#           username: <username>,
-#           fullname: <fullname> 
-#           other_user_picked_teams : user_picked_teams[0:curr week # - 1]
-#           other_user_start_streak: user_start_streak,
-#           other_is_start_streak_alive: is_start_streak_alive,
-#           other_latest_streak: latest_streak,
-#           other_total_correct: total_curect,
-#           other_latest_week: 0 
-#       }
 
 
 # get_all_matchups()
