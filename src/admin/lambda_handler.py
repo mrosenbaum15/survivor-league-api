@@ -41,9 +41,6 @@ def submit_results(body):
         users = resp["Items"]
 
         for user in users:
-            if(not user["username"] == 'mrosenbaum15'):
-                print("Testing only with myself")
-                continue
             print("29")
             print(user["user_picked_teams"][week_num])
             current_team = list(user["user_picked_teams"][week_num].keys())[0]
@@ -90,6 +87,11 @@ def submit_results(body):
             else:
                 print("THIS USER HASN'T SUBMITTED THEIR PICK")
                 print(user)
+                user["is_start_streak_alive"] = False
+                print(user)
+                table.put_item(
+                    Item=user
+                )
 
         # return ""
     except Exception as e:
