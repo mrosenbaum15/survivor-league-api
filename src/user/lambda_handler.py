@@ -87,7 +87,7 @@ def get_curr_user_info_standings(username):
     try:
         resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
         userinfo = resp["Items"][0]
-
+        
         week_num = get_current_week()
         sunday_of_curr_week = week_to_date_range(week_num)
         
@@ -111,8 +111,9 @@ def get_curr_user_info_standings(username):
         elif(today >= target_date and week_num == 1):
             user_picks.append(userinfo["user_picked_teams"][0])                          
         elif(today >= target_date):
-            user_picks = userinfo["user_picked_teams"][0:week_num]              
-
+            user_picks = userinfo["user_picked_teams"][0:week_num]                    
+        
+        print(user_picks)
         return {
             "username": userinfo["username"],
             "fullname": userinfo["name"],
@@ -152,11 +153,11 @@ def get_all_users(week_num):
         print(today)
         print(type(today))
 
-        user_picks = []
-        if(today < target_date and week_num > 1):
-            user_picks = userinfo["user_picked_teams"][0:(week_num-2)]            
-        elif(today >= target_date):
-            user_picks = userinfo["user_picked_teams"][0:(week_num-1)]                    
+        # user_picks = []
+        # if(today < target_date and week_num > 1):
+        #     user_picks = userinfo["user_picked_teams"][0:(week_num-2)]            
+        # elif(today >= target_date):
+        #     user_picks = userinfo["user_picked_teams"][0:(week_num-1)]                    
         
         resp = table.query(KeyConditionExpression= Key('type').eq('userinfo'))
         userinfo = resp["Items"]

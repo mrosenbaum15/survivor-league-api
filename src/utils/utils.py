@@ -2,8 +2,25 @@ import pytz
 from datetime import date, timedelta, datetime
 import time
 
+def is_dst(dt, timezone="America/Chicago"):
+    if dt is None:
+        dt = datetime.utcnow()
+    timezone = pytz.timezone(timezone)
+    timezone_aware_date = timezone.localize(dt, is_dst=None)
+    return timezone_aware_date.tzinfo._dst.seconds != 0 
+
 def get_current_week():
     today = datetime.now()
+    
+    if(is_dst(today)):
+        hour_diff = 5
+    else:
+        hour_diff = 6
+
+    today = (today - timedelta(hours=hour_diff)).strftime("%d-%m-%Y")
+    
+    today = datetime.strptime(today, "%d-%m-%Y")
+    print(today)
 
     if(today >= datetime.strptime("13-09-2022", "%d-%m-%Y") and today < datetime.strptime("20-09-2022", "%d-%m-%Y")):
         return 2
@@ -42,12 +59,6 @@ def get_current_week():
     else:
         return 1
 
-def is_dst(dt, timezone="America/Chicago"):
-    if dt is None:
-        dt = datetime.utcnow()
-    timezone = pytz.timezone(timezone)
-    timezone_aware_date = timezone.localize(dt, is_dst=None)
-    return timezone_aware_date.tzinfo._dst.seconds != 0        
 
 def week_to_date_range(week_num):
 
