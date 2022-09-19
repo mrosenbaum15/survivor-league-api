@@ -47,14 +47,13 @@ def get_standings():
 
             user_longest_obj = {username: [start_streak, is_start_streak_alive, username]}
             user_most_obj = {username: total_correct}
-
+            
             if(i == 0):
                 longest_start_streak_arr.append(user_longest_obj)
                 most_correct_arr.append(user_most_obj)
                 i += 1
                 continue
-            
-            print(longest_start_streak_arr)
+
             j = 1
             for item in longest_start_streak_arr:
                 other_vals = next(iter(item.values()))
@@ -67,12 +66,18 @@ def get_standings():
                     else:
                         longest_start_streak_arr.insert(j-1, user_longest_obj)    
                     break
+                elif(j == len(longest_start_streak_arr)):
+                    longest_start_streak_arr.append(user_longest_obj)
+                    break
                 j += 1 
-            
+
             k = 1
             for item in most_correct_arr:
                 if(total_correct >= next(iter(item.values()))):
                     most_correct_arr.insert(k-1, user_most_obj)     
+                    break
+                elif(k == len(most_correct_arr)):
+                    most_correct_arr.append(user_most_obj)
                     break
                 k += 1
                 
