@@ -1,105 +1,129 @@
 import json
+from datetime import datetime, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
+from src.utils.utils import get_current_week, week_to_date_range, is_dst
 
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table('survivor-league-db')
 
-# set_weekly_game_results(dict team_1_result, dict team_2_result, int week#)
-# each game result will have their own item for each week
-    # item 1: pk = 'result', sk = 1, results = {"team1": boolean, "team2": boolean}
-    # item 2: pk = 'result', sk = 2, results = {"team1": boolean, "team2": boolean}
-# admin: enter each week's results from front-end (show match-up, win/loss/tie), on backend have object as such for Bears vs Packers:
-# start with:
-    # pk = 'result' (fixed), sk = 1 (int for week #, dynamic ?)
-    # req_body (individual object):
-    #    {
-    #      "Bears": True, 
-    #      "Packers": False,
-    #       ... all 30 teams repesented, null means no result yet
-    #    }
-    # params: week (0 < x < 19), matchup result (bool win = T, loss/tie = F)
-# then do a scan where pk = 'username' 
-# for each user... update with put_item
-#   if latest_week >= week #, RETURN
-#   else:
-#       set current user's picked team for the given week
-#       if (user didn't select a team) key(Item[user_picked_teams][week #]) == "" OR user selected a LOSS:
-#           is_start_streak_alive = False
-#           latest_streak = 0
-#       else if user was currect
-#           if is_start_streak_alive:
-#               start_streak++
-#           latest_streak++
-#           total_correct++
-#           
 
-# get_standings()
-# scan where pk = 'username' 
-#   example return value: 
-#        {
-#           "longest_start_streak": ["Rosey": 15, "Brad": 13, "Swill": 5],
-#           "most_correct": ["Rosey": 15, "Swill": 14, "Brad": 13]
-#        }
-            
-#   push first user into new dict: 
-#   for each user after: 
-#       for each in longest_start_streak
-#           if start_streak >= other_start_streak:
-#               insert before
-#           else:
-#               continue to next user;
-#           
-#           if most_correct >= other_most_correct:
-#               insert before
-#           else:
-#               continue to next user:     
-#
-#        
+# setup_new_user(string username, string fullname)
+# after registration, add empty user
+    # pk = 'userinfo' (fixed), sk = None
+    # req_body:
+    # Item {
+    #   id: 'userinfo',  
+    #   username: <username>,
+    #   name: <fullname>,
+    #   user_picked_teams : {"": null, "": null, "": null, "": , "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null, "": null},
+    #   start_streak: 0,
+    #   is_start_streak_alive: true,
+    #   latest_streak: 0,
+    #   total_correct: 0,
+    #   latest_week: 0 
+    # }
 
+def setup_new_user(body):
+    username = body["username"]
+    fullname= body["fullname"]
 
-# get_other_user_info()
-# on the standings page, only allow users to see up to a given week
-#      need backend to determine current week
-#      pk = 'username', sk = None
-#      query the DB table using pk and 'username' = <username>
-#      return:
-#       Item {
-#           id: 'userinfo',  
-#           username: <username>,
-#           fullname: <fullname> 
-#           other_user_picked_teams : user_picked_teams[0:curr week # - 1]
-#           other_user_start_streak: user_start_streak,
-#           other_is_start_streak_alive: is_start_streak_alive,
-#           other_latest_streak: latest_streak,
-#           other_total_correct: total_curect,
-#           other_latest_week: 0 
-#       }
-
-
-# get_all_matchups()
-# return all matchups - get every matchup for all 18 weeks
-    # pk = 'matchup' (fixed), sk = None
-    # resp_body (list of list of strings):
-    # [
-    #   [
-    #    "Chicago Bears vs Minnesota Vikings,
-    #    "Dallas Cowboys vs New York Giants"
-    #   ],
-    #   [
-    #    "Chicago Bears vs Green Bay Packers,
-    #    "Dallas Cowboys vs Philadelphia Eagles"
-    #   ]
-    # ]
-
-def get_all_matchups():
+    print(username + fullname)
     try:
-        print("HERE")
-        resp = table.query(KeyConditionExpression= Key('type').eq('matchup') &  Key('id').eq('all'))
-        print(resp)
-        return resp["Items"][0]["matchups"], resp["Items"][0]["deadlines"]
+        table.put_item(
+            Item={
+                'type': 'userinfo',
+                'id': username,
+                'username': username,
+                'name': fullname,
+                'user_picked_teams':  [{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""},{"Team": ""}],
+                'start_streak': 0,
+                'is_start_streak_alive': True,
+                'latest_streak': 0,
+                'total_correct': 0,
+                'latest_week': 0
+            }
+        )
     except Exception as e:
-        raise Exception("Unable to get matchups with error: " + str(e))
+        raise Exception("Unable to create new user with error: " + str(e))
+        
+
+# get_curr_user_info(string username, string fullname)
+# return all relevant info about a user
+    # pk = 'userinfo' (fixed), sk = None
+    # resp_body:
+    # Item {
+    #   id: 'userinfo',
+    #   username: <username>,
+    #   name: <fullname>,
+    #   user_picked_teams : {"Rams": true, "Browns": true, "Broncos": true, "Cowboys": true, "Buccaneers": true, "Steelers": true, "Cardinals": true, "Chiefs": true, "Colts": true, "Bills": true, "Titans": false, "Texans": false, "Dolphins": true, "Chargers": true, "Niners": true, "Eagles": true, "Patriots": true, "Packers": null},
+    #   start_streak: int,
+    #   is_start_streak_alive: bool
+    #   latest_streak: int
+    #   total_correct: int,
+    #   latest_week: int,
+    # }
+
+def get_curr_user_info(username):
+
+    try:
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
+        userinfo = resp["Items"][0]
+
+        return {
+            "username": userinfo["username"],
+            "fullname": userinfo["name"],
+            "start_streak": int(userinfo['start_streak']),
+            "total_correct": int(userinfo['total_correct']),
+            "is_start_streak_alive": userinfo['is_start_streak_alive'],
+            "user_picked_teams": userinfo["user_picked_teams"]
+        }
+    except Exception as e:
+        raise Exception("Unable to get user info with error: " + str(e))
+
+        
+def get_curr_user_info_standings(username):
+
+    try:
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
+        userinfo = resp["Items"][0]
+        
+        week_num = get_current_week()
+        sunday_of_curr_week = week_to_date_range(week_num)
+        
+        print("DONE WITH SUNDAY OF CURR WEEK")
+        today = datetime.now()
+
+        print(sunday_of_curr_week)
+        print(type(sunday_of_curr_week))
+
+        target_date = datetime.strptime(sunday_of_curr_week, '%d-%m-%Y %H:%M:%S')
+
+        print(target_date)
+        print(type(target_date))
+        
+        print(today)
+        print(type(today))
+
+        user_picks = []
+        if(today < target_date and week_num > 1):
+            user_picks = userinfo["user_picked_teams"][0:(week_num-1)]
+        elif(today >= target_date and week_num == 1):
+            user_picks.append(userinfo["user_picked_teams"][0])                          
+        elif(today >= target_date):
+            user_picks = userinfo["user_picked_teams"][0:week_num]                    
+        
+        print(user_picks)
+        return {
+            "username": userinfo["username"],
+            "fullname": userinfo["name"],
+            "start_streak": int(userinfo['start_streak']),
+            "total_correct": int(userinfo['total_correct']),
+            "is_start_streak_alive": userinfo['is_start_streak_alive'],
+            "user_picked_teams": user_picks
+        }
+    except Exception as e:
+        raise Exception("Unable to get user info with error: " + str(e))        
 
 # submit_user_pick(string username, string team, int week #)
 # submit user's pick for a given week
@@ -109,51 +133,54 @@ def get_all_matchups():
 #         update user_picked_teams[week #] = <team>: null
 #         write user entire user object back as an item 
 
-def submit_user_pick(body):
-    username = body["username"]
-    week_num = body["weekNum"]
-    team = body["pick"].strip()
-
+def get_all_users(week_num):
     try:
-        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo') & Key('id').eq(username))
-        curr_user = resp["Items"][0]
+        sunday_of_curr_week = week_to_date_range(week_num)
+        
+        print("DONE WITH SUNDAY OF CURR WEEK")
+        today = datetime.now()
 
-        curr_user["user_picked_teams"][week_num-1] = {team: ""}
+        print(sunday_of_curr_week)
+        print(type(sunday_of_curr_week))
+        
+        target_date = datetime.strptime(sunday_of_curr_week, '%d-%m-%Y %H:%M:%S')
+        
+        if(today < target_date and week_num > 1):
+            return {"see_users": False}
 
-        table.put_item(
-            Item=curr_user
-        )
+        print(target_date)
+        print(type(target_date))
+        
+        print(today)
+        print(type(today))
+
+        # user_picks = []
+        # if(today < target_date and week_num > 1):
+        #     user_picks = userinfo["user_picked_teams"][0:(week_num-2)]            
+        # elif(today >= target_date):
+        #     user_picks = userinfo["user_picked_teams"][0:(week_num-1)]                    
+        
+        resp = table.query(KeyConditionExpression= Key('type').eq('userinfo'))
+        userinfo = resp["Items"]
+
+        print(userinfo)
+        
+        user_return = []
+        for user in userinfo:
+            user_return.append({user['id']: user['user_picked_teams'][int(week_num)-1]})
+        return user_return
     except Exception as e:
-        raise Exception("Unable to submit pick with error: " + str(e))
+        raise Exception("Unable to get user info with error: " + str(e))
 
 
 
 
 def lambda_handler(event, context):
     print(event)
-    print("RETURNING 200")
     
-    matchups = []
-    if(event["path"] == "/get-all-matchups"):
-        print("GETTING ALL MATCHUPS")
-        matchups, deadlines = get_all_matchups()
-        return_body = {
-            "matchups": matchups,
-            "deadlines": deadlines
-        }
-        return {
-            "statusCode": 200,
-            "body": json.dumps(return_body),
-            "headers": {
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": '*'
-            }
-        }    
-
-
-    elif(event["path"] == "/submit-pick"):
-        print("SUBMITTING PICK")
-        submit_user_pick(json.loads(event["body"]))
+    if(event["path"] == "/setup-new-user"):
+        print("Setting up new user")
+        code = setup_new_user(json.loads(event["body"]))
         return {
             "statusCode": 201,
             "headers": {
@@ -162,8 +189,40 @@ def lambda_handler(event, context):
             }
         }    
 
-    
-    print(json.dumps(matchups))
+    elif(event["path"] == "/userinfo"):
+        print("Getting user info")
+        user = get_curr_user_info(event["queryStringParameters"]["user"])
+        return {
+            "statusCode": 200,
+            "body": json.dumps(user, sort_keys=True),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+                }
+            }    
 
+    elif(event["path"] == "/user-info-standings"):
+        print("Getting user info for standings")
+        user = get_curr_user_info_standings(event["queryStringParameters"]["user"])
+        return {
+            "statusCode": 200,
+            "body": json.dumps(user, sort_keys=True),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+                }
+            }                
+
+    elif(event["path"] == "/all-users"):
+        print("Getting user info for Current Week")
+        users = get_all_users(event["queryStringParameters"]["week_num"])
+        return {
+            "statusCode": 200,
+            "body": json.dumps(users, sort_keys=True),
+            "headers": {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": '*'
+                }
+            }                
 
 
